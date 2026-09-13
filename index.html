@@ -49,4 +49,4 @@ document.getElementById('loginForm').onsubmit=async e=>{e.preventDefault();authE
 document.getElementById('signupButton').onclick=async()=>{authError.classList.add('hidden');try{const c=await firebase.auth().createUserWithEmailAndPassword(emailInput.value.trim(),passwordInput.value);await cloud.collection('users').doc(c.user.uid).set({email:emailInput.value.trim().toLowerCase(),role:'Sales Advisor',createdAt:new Date().toISOString()});await signedIn(c.user)}catch(err){authMsg(err)}};
 document.getElementById('logoutButton').onclick=()=>firebase.auth().signOut();document.getElementById('lang').onchange=e=>{lang=e.target.value;localStorage.setItem('dasmot-lang',lang);render()};
 if(cloud)firebase.auth().onAuthStateChanged(u=>{if(u)signedIn(u);else{currentUser=null;profile=null;appRoot.classList.add('hidden');login.classList.remove('hidden')}});else authMsg({message:'Firebase belum tersedia.'});
-</script></body></html>
+</script><script>Array.from(document.body.childNodes).filter(n=>n.nodeType===3&&n.textContent.includes('.auth-screen{')).forEach(n=>n.remove());</script></body></html>
