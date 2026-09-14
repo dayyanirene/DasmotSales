@@ -1,0 +1,11 @@
+DASMOT SALES — HTML lengkap
+
+index.html mengandungi semua HTML, CSS dan logik aplikasi tujuh bahagian. Tetapan Firebase dasmot-sales sudah dimasukkan. Firebase SDK dimuatkan daripada CDN rasmi.
+
+Untuk GitHub Pages: letakkan index.html, sw.js, manifest.webmanifest dan favicon.svg bersama dalam folder v2/ repositori dayyanirene/DasmotSales. Ini mengekalkan laman lama di akar repositori. Pakej ini belum dimuat naik.
+
+Untuk offline: buka melalui HTTPS (GitHub Pages) atau localhost semasa online dahulu, tunggu Aplikasi tersedia offline, log masuk dan muatkan data. Fail HTML sahaja tidak boleh menyediakan pembukaan semula offline sepenuhnya; sw.js diperlukan. Membuka fail terus melalui file:// bukan cara menjalankan Firebase/offline yang disokong.
+
+firestore.rules melindungi koleksi dasmot_v2_ sahaja. Gabungkan dengan peraturan sebenar projek Firebase; jangan gantikan peraturan aplikasi lama begitu sahaja. Akaun Firebase Authentication memerlukan dokumen dasmot_v2_users/{uid} dengan active:true dan role:admin atau sales. Jangan berikan akaun awam akses Admin.
+
+Pengesahan: JavaScript gabungan telah diperiksa sintaksnya. 26 ujian logik aplikasi lulus sebelum eksport. Ujian Firebase sebenar, pengesahan peraturan Firebase dan penerbitan GitHub masih belum dilakukan.

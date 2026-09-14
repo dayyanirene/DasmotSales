@@ -1,0 +1,118 @@
+rules_version = '2';
+// Merge these v2 matches into the current deployed rules; do not replace legacy matches.
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function member() { return request.auth != null && exists(/databases/$(database)/documents/dasmot_v2_users/$(request.auth.uid)) && get(/databases/$(database)/documents/dasmot_v2_users/$(request.auth.uid)).data.active == true; }
+  function admin() { return member() && get(/databases/$(database)/documents/dasmot_v2_users/$(request.auth.uid)).data.role == 'admin'; }
+  function owned(d) { return member() && (admin() || d.ownerId == request.auth.uid); }
+  function text(v,n) { return v is string && v.size() <= n; }
+  function unitKey(v) { return v is string && v.matches('^[A-Z0-9]{3,40}$'); }
+  function stockPath(id) { return /databases/$(database)/documents/dasmot_v2_stock/$(id); }
+  function bookingPath(id) { return /databases/$(database)/documents/dasmot_v2_bookings/$(id); }
+  function common(d) { return d.ownerId is string && d.version is int && d.version > 0 && text(d.lastChangeId,64) && d.lastChangeId.size()>0 && d.updatedAt == request.time && d.createdAt is timestamp && text(d.model,100) && text(d.notes,2000); }
+  function creating(d) { return member() && d.ownerId == request.auth.uid && d.version == 1 && d.createdAt == request.time; }
+  function nextVersion(d) { return d.ownerId == resource.data.ownerId && d.createdAt == resource.data.createdAt && d.version == resource.data.version + 1; }
+  function updating(d) { return owned(resource.data) && nextVersion(d); }
+  function financeMeta(d) { return d.ownerId is string && d.version is int && d.version>0 && d.createdAt is timestamp && d.updatedAt==request.time && text(d.lastChangeId,64) && d.lastChangeId.size()>0 && text(d.notes,2000) && text(d.bookingId,128) && d.amountSen is int && d.amountSen>0 && d.amountSen<=1000000000; }
+  match /dasmot_v2_users/{uid} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
+  match /dasmot_v2_users/{uid}/sync/{changeId} {
+   allow get: if member() && request.auth.uid == uid;
+   allow list, update, delete: if false;
+   allow create: if member() && request.auth.uid == uid
+     && request.resource.data.keys().hasOnly(['kind','recordId','version','createdAt'])
+     && request.resource.data.kind in ['customers','bookings','stock','loans','payments']
+     && request.resource.data.recordId is string && request.resource.data.version is int && request.resource.data.createdAt == request.time
+     && getAfter(/databases/$(database)/documents/$("dasmot_v2_" + request.resource.data.kind)/$(request.resource.data.recordId)).data.lastChangeId == changeId
+     && getAfter(/databases/$(database)/documents/$("dasmot_v2_" + request.resource.data.kind)/$(request.resource.data.recordId)).data.version == request.resource.data.version
+     && owned(getAfter(/databases/$(database)/documents/$("dasmot_v2_" + request.resource.data.kind)/$(request.resource.data.recordId)).data);
+  }
+  match /dasmot_v2_customers/{id} {
+   function valid(d) { return d.keys().hasAll(['name','phone','model','status','followUp','notes','ownerId','version','createdAt','updatedAt','lastChangeId']) && d.keys().hasOnly(['name','phone','model','status','followUp','notes','ownerId','version','createdAt','updatedAt','lastChangeId','advisorName']) && text(d.get('advisorName',''),150) && common(d) && text(d.name,100) && d.name.size()>0 && text(d.phone,30) && d.phone.size()>0 && text(d.followUp,10) && d.status in ['Baharu','Dihubungi','Berminat','Tidak berminat']; }
+   allow read: if owned(resource.data);
+   allow create: if valid(request.resource.data) && creating(request.resource.data);
+   allow update: if valid(request.resource.data) && updating(request.resource.data);
+   allow delete: if false;
+  }
+  match /dasmot_v2_bookings/{id} {
+   function valid(d) { return d.keys().hasAll(['customerId','model','priceSen','status','bank','notes','ownerId','version','createdAt','updatedAt','lastChangeId']) && d.keys().hasOnly(['customerId','model','priceSen','status','bank','notes','ownerId','version','createdAt','updatedAt','lastChangeId','vehicleId','deliveryDate','advisorName','variant','color','depositSen','paidSen','lastPaymentId','deliveryChecks']) && text(d.get('variant',''),100) && text(d.get('color',''),60) && d.get('depositSen',0) is int && d.get('depositSen',0)>=0 && d.get('depositSen',0)<=d.priceSen && d.get('paidSen',0) is int && d.get('paidSen',0)>=0 && d.get('paidSen',0)<=1000000000 && text(d.get('lastPaymentId',''),64) && common(d) && text(d.customerId,128) && d.priceSen is int && d.priceSen>0 && d.priceSen<=1000000000 && text(d.bank,100) && text(d.get('advisorName',''),150) && text(d.get('vehicleId',''),40) && text(d.get('deliveryDate',''),10) && d.status in ['Baharu','Diproses','Menunggu bank','Diluluskan','Dibatalkan','Diserahkan'] && owned(get(/databases/$(database)/documents/dasmot_v2_customers/$(d.customerId)).data); }
+   function deliveryComplete(d) { return d.get('paidSen',0)>=d.priceSen && d.deliveryChecks is map && d.deliveryChecks.keys().hasOnly(['identity','registration','insurance','roadTax','handover','keys']) && d.deliveryChecks.identity==true && d.deliveryChecks.registration==true && d.deliveryChecks.insurance==true && d.deliveryChecks.roadTax==true && d.deliveryChecks.handover==true && d.deliveryChecks['keys']==true; }
+   function moneyChange(d) {
+    let old=resource.data;
+    let payment=/databases/$(database)/documents/dasmot_v2_payments/$(d.get('lastPaymentId',''));
+    return (d.get('paidSen',0)==old.get('paidSen',0) && d.get('lastPaymentId','')==old.get('lastPaymentId',''))
+      || (d.get('lastPaymentId','')!='' && !exists(payment) && getAfter(payment).data.bookingId==id && getAfter(payment).data.createdAt==request.time
+       && d.paidSen==old.get('paidSen',0)+(getAfter(payment).data.type=='Pemulangan'?-getAfter(payment).data.amountSen:getAfter(payment).data.amountSen));
+   }
+   function linked(d) {
+    return d.get('vehicleId','') == '' ? d.status != 'Diserahkan'
+      : d.status != 'Dibatalkan' && getAfter(stockPath(d.vehicleId)).data.bookingId == id
+        && getAfter(stockPath(d.vehicleId)).data.model.lower() == d.model.lower()
+        && getAfter(stockPath(d.vehicleId)).data.status == (d.status == 'Diserahkan' ? 'Diserahkan' : 'Diperuntukkan');
+   }
+   function transition(d) {
+    let old=resource.data;
+    let previous=old.get('vehicleId','');
+    let next=d.get('vehicleId','');
+    return (old.status != 'Diserahkan' || (d.status == 'Diserahkan' && next == previous && d.customerId == old.customerId && d.model == old.model && d.deliveryDate == old.deliveryDate))
+      && (previous == '' || (d.customerId == old.customerId && d.model == old.model))
+      && (previous == next || (previous == ''
+          ? old.status != 'Dibatalkan' && get(stockPath(next)).data.status == 'Tersedia' && get(stockPath(next)).data.bookingId == '' && getAfter(stockPath(next)).data.version == get(stockPath(next)).data.version + 1
+          : next == '' && d.status == 'Dibatalkan' && old.status != 'Diserahkan' && getAfter(stockPath(previous)).data.status == 'Tersedia' && getAfter(stockPath(previous)).data.bookingId == '' && getAfter(stockPath(previous)).data.version == get(stockPath(previous)).data.version + 1))
+      && (d.status != 'Diserahkan' || (d.deliveryDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') && next != '' && (old.status == 'Diserahkan' || (deliveryComplete(d) && d.priceSen==old.priceSen && get(stockPath(next)).data.status == 'Diperuntukkan' && getAfter(stockPath(next)).data.version == get(stockPath(next)).data.version + 1))));
+   }
+   allow read: if owned(resource.data);
+   allow create: if valid(request.resource.data) && creating(request.resource.data) && request.resource.data.get('vehicleId','') == '' && request.resource.data.status != 'Diserahkan' && request.resource.data.get('paidSen',0)==0 && request.resource.data.get('lastPaymentId','')=='';
+   allow update: if valid(request.resource.data) && updating(request.resource.data) && linked(request.resource.data) && transition(request.resource.data) && moneyChange(request.resource.data);
+   allow delete: if false;
+  }
+  match /dasmot_v2_loans/{id} {
+   function valid(d) { return d.keys().hasAll(['bookingId','bank','amountSen','status','notes','ownerId','version','createdAt','updatedAt','lastChangeId']) && d.keys().hasOnly(['bookingId','bank','amountSen','status','notes','ownerId','version','createdAt','updatedAt','lastChangeId']) && financeMeta(d) && text(d.bank,100) && d.bank.size()>0 && d.status in ['Draf','Dihantar','Dalam semakan','Diluluskan','Ditolak','Dibatalkan'] && owned(get(bookingPath(d.bookingId)).data) && d.ownerId==get(bookingPath(d.bookingId)).data.ownerId; }
+   allow read: if owned(resource.data);
+   allow create: if valid(request.resource.data) && request.resource.data.version==1 && request.resource.data.createdAt==request.time && !(get(bookingPath(request.resource.data.bookingId)).data.status in ['Dibatalkan','Diserahkan']);
+   allow update: if valid(request.resource.data) && updating(request.resource.data) && request.resource.data.bookingId==resource.data.bookingId;
+   allow delete: if false;
+  }
+  match /dasmot_v2_payments/{id} {
+   function valid(d) { return d.keys().hasAll(['bookingId','type','amountSen','date','method','reference','notes','ownerId','version','createdAt','updatedAt','lastChangeId']) && d.keys().hasOnly(['bookingId','type','amountSen','date','method','reference','notes','ownerId','version','createdAt','updatedAt','lastChangeId']) && financeMeta(d) && d.type in ['Deposit','Bayaran pelanggan','Bayaran bank','Pemulangan'] && d.method in ['Pindahan bank','Tunai','Kad','Cek'] && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') && text(d.reference,150) && d.reference.size()>0; }
+   function balance(d) {
+    let before=get(bookingPath(d.bookingId)).data;
+    let after=getAfter(bookingPath(d.bookingId)).data;
+    return owned(before) && d.ownerId==before.ownerId && (before.status!='Dibatalkan'||d.type=='Pemulangan')
+      && (d.type!='Pemulangan'||d.amountSen<=before.get('paidSen',0))
+      && after.paidSen==before.get('paidSen',0)+(d.type=='Pemulangan'?-d.amountSen:d.amountSen)
+      && after.lastPaymentId==id && after.version==before.version+1 && after.lastChangeId==d.lastChangeId
+      && after.diff(before).affectedKeys().hasOnly(['paidSen','lastPaymentId','version','updatedAt','lastChangeId']);
+   }
+   allow read: if owned(resource.data);
+   allow create: if valid(request.resource.data) && request.resource.data.version==1 && request.resource.data.createdAt==request.time && balance(request.resource.data);
+   allow update, delete: if false;
+  }
+  match /dasmot_v2_engines/{engine} {
+   allow get: if member();
+   allow list, update, delete: if false;
+   allow create: if admin() && unitKey(engine) && request.resource.data.keys().hasOnly(['stockId']) && getAfter(stockPath(request.resource.data.stockId)).data.engine == engine;
+  }
+  match /dasmot_v2_stock/{id} {
+   function valid(d) { return d.keys().hasAll(['model','variant','color','chassis','engine','arrival','location','status','bookingId','notes','ownerId','version','createdAt','updatedAt','lastChangeId']) && d.keys().hasOnly(['model','variant','color','chassis','engine','arrival','location','status','bookingId','notes','ownerId','version','createdAt','updatedAt','lastChangeId']) && common(d) && unitKey(id) && d.chassis == id && unitKey(d.engine) && text(d.variant,100) && d.variant.size()>0 && text(d.color,60) && d.color.size()>0 && text(d.arrival,10) && text(d.location,150) && d.location.size()>0 && text(d.bookingId,128) && d.status in ['Dalam perjalanan','Tersedia','Diperuntukkan','Diserahkan']; }
+   function pair(d) {
+    return d.bookingId == '' ? d.status in ['Dalam perjalanan','Tersedia']
+      : getAfter(bookingPath(d.bookingId)).data.vehicleId == id && getAfter(bookingPath(d.bookingId)).data.status != 'Dibatalkan'
+        && getAfter(bookingPath(d.bookingId)).data.model.lower() == d.model.lower()
+        && d.status == (getAfter(bookingPath(d.bookingId)).data.status == 'Diserahkan' ? 'Diserahkan' : 'Diperuntukkan');
+   }
+   function operation(d) {
+    let old=resource.data;
+    return d.diff(old).affectedKeys().hasOnly(['status','bookingId','version','updatedAt','lastChangeId']) && (
+      (old.status == 'Tersedia' && old.bookingId == '' && d.status == 'Diperuntukkan' && d.bookingId != '' && owned(get(bookingPath(d.bookingId)).data) && get(bookingPath(d.bookingId)).data.get('vehicleId','') == '' && getAfter(bookingPath(d.bookingId)).data.version == get(bookingPath(d.bookingId)).data.version + 1)
+      || (old.status == 'Diperuntukkan' && owned(get(bookingPath(old.bookingId)).data) && getAfter(bookingPath(old.bookingId)).data.version == get(bookingPath(old.bookingId)).data.version + 1 && (
+        (d.status == 'Tersedia' && d.bookingId == '' && getAfter(bookingPath(old.bookingId)).data.status == 'Dibatalkan' && getAfter(bookingPath(old.bookingId)).data.vehicleId == '')
+        || (d.status == 'Diserahkan' && d.bookingId == old.bookingId && getAfter(bookingPath(old.bookingId)).data.status == 'Diserahkan'))));
+   }
+   function metadata(d) { return admin() && d.bookingId == resource.data.bookingId && (resource.data.bookingId == '' ? d.status in ['Dalam perjalanan','Tersedia'] : d.status == resource.data.status); }
+   allow read: if member();
+   allow create: if admin() && valid(request.resource.data) && creating(request.resource.data) && request.resource.data.bookingId == '' && request.resource.data.status in ['Dalam perjalanan','Tersedia'] && getAfter(/databases/$(database)/documents/dasmot_v2_engines/$(request.resource.data.engine)).data.stockId == id;
+   allow update: if member() && valid(request.resource.data) && nextVersion(request.resource.data) && request.resource.data.chassis == resource.data.chassis && request.resource.data.engine == resource.data.engine && pair(request.resource.data) && (metadata(request.resource.data) || operation(request.resource.data));
+   allow delete: if false;
+  }
+ }
+}
