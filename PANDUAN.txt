@@ -8,4 +8,4 @@ Untuk offline: buka melalui HTTPS (GitHub Pages) atau localhost semasa online da
 
 firestore.rules melindungi koleksi dasmot_v2_ sahaja. Gabungkan dengan peraturan sebenar projek Firebase; jangan gantikan peraturan aplikasi lama begitu sahaja. Akaun Firebase Authentication memerlukan dokumen dasmot_v2_users/{uid} dengan active:true dan role:admin atau sales. Jangan berikan akaun awam akses Admin.
 
-Pengesahan: JavaScript gabungan telah diperiksa sintaksnya. 26 ujian logik aplikasi lulus sebelum eksport. Ujian Firebase sebenar, pengesahan peraturan Firebase dan penerbitan GitHub masih belum dilakukan.
+Pengesahan: JavaScript gabungan telah diperiksa sintaksnya. 29 ujian logik aplikasi lulus sebelum eksport. Paparan log masuk telah diperiksa tanpa pertindihan menu. Ujian Firebase sebenar, pengesahan peraturan Firebase dan penerbitan GitHub masih belum dilakukan.

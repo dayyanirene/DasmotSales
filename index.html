@@ -9,9 +9,10 @@
 .stock-stats{grid-template-columns:repeat(4,minmax(0,1fr))}.stock-actions{display:flex;gap:8px;flex-wrap:wrap}#stock-filter{max-width:225px}@media(max-width:1050px){.stock-stats{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){nav{flex-wrap:wrap}.stock-stats{grid-template-columns:1fr}.stock-actions{min-width:130px}}
 .delivery-checks{border:1px solid #d2dce6;border-radius:7px;padding:16px;margin:20px 0}.delivery-checks label{display:flex;align-items:center;gap:10px;line-height:1.5}.delivery-checks input{width:20px;height:20px;flex-shrink:0;margin:0}.delivery-checks legend{font-size:14px;font-weight:600}
 aside{overflow-y:auto}.stat strong{overflow-wrap:anywhere}#account{font-size:14px}
+.signed-out>aside,.signed-out>main>header,.signed-out>main>.heading{display:none}.signed-out>main{margin:0 auto;padding:24px 18px;max-width:540px}.signed-out .login{margin:22px auto;max-width:none;padding:28px}.signed-out #notice{overflow-wrap:anywhere}#login-error{color:#a03732;font-size:14px;line-height:1.6}#login-error:empty{display:none}@media print{aside,header,.connection-bar,.heading,#sync-status{display:none!important}main{margin:0!important;padding:16px!important}.login{max-width:440px;margin:20px auto}body{background:white}}
 
 </style></head>
-<body><aside><a class="brand" href="#ringkasan"><b>DM<span> / </span></b>DASMOT SALES</a><p class="eyebrow">RUANG KERJA JUALAN</p><nav><a href="#ringkasan">◫ &nbsp; Dashboard</a><a href="#pelanggan">◎ &nbsp; Pelanggan & susulan</a><a href="#tempahan">▤ &nbsp; Tempahan</a><a href="#pinjaman">▥ &nbsp; Pinjaman</a><a href="#stok">▱ &nbsp; Stok & peruntukan</a><a href="#bayaran">▦ &nbsp; Bayaran</a><a href="#penyerahan">✓ &nbsp; Penyerahan</a></nav><div class="aside-bottom"><span class="avatar">DM</span><div>Dasuki Motors<small>Pengurusan jualan</small></div></div></aside>
+<body class="signed-out"><aside><a class="brand" href="#ringkasan"><b>DM<span> / </span></b>DASMOT SALES</a><p class="eyebrow">RUANG KERJA JUALAN</p><nav><a href="#ringkasan">◫ &nbsp; Dashboard</a><a href="#pelanggan">◎ &nbsp; Pelanggan & susulan</a><a href="#tempahan">▤ &nbsp; Tempahan</a><a href="#pinjaman">▥ &nbsp; Pinjaman</a><a href="#stok">▱ &nbsp; Stok & peruntukan</a><a href="#bayaran">▦ &nbsp; Bayaran</a><a href="#penyerahan">✓ &nbsp; Penyerahan</a></nav><div class="aside-bottom"><span class="avatar">DM</span><div>Dasuki Motors<small>Pengurusan jualan</small></div></div></aside>
 <main><header><span>Operasi / <b id="breadcrumb">Ringkasan</b></span><span id="account">Memuatkan…</span></header><div class="connection-bar"><span id="connection" role="status">Menyediakan aplikasi…</span><button id="install" class="quiet" hidden>Pasang aplikasi</button></div><div id="notice" role="status"></div><section id="sync-status" aria-live="polite"></section><section class="heading"><div><p class="eyebrow">DASMOT SALES</p><h1 id="title">Ringkasan jualan</h1><p id="subtitle">Urus pelanggan dan tempahan dalam satu tempat.</p></div><button id="new" disabled>+ Pelanggan baharu</button></section><section id="content"></section><p id="feedback" role="alert"></p></main>
 <dialog id="editor"><form id="record-form"><div class="dialog-heading"><h2 id="form-title">Pelanggan baharu</h2><button type="button" id="close" class="quiet" aria-label="Tutup">✕</button></div><div id="fields"></div><p id="form-error" role="alert"></p><footer><button type="button" id="cancel" class="quiet">Batal</button><button type="submit" id="save">Simpan</button></footer></form></dialog>
 <script type="module">
@@ -229,6 +230,25 @@ async function synchronizeFinance(api,db,change,currentUid){
 return {synchronizeFinance};
 })();
 
+// auth-ui.js
+__modules["auth-ui.js"] = (() => {
+function loginError(err){
+ const code=err?.code||'';
+ if(['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-login-credentials'].includes(code))return 'E-mel atau kata laluan tidak tepat. Gunakan akaun pengguna DASMOT SALES yang telah didaftarkan.';
+ if(code==='auth/invalid-email')return 'Format e-mel tidak sah. Semak e-mel anda.';
+ if(code==='auth/network-request-failed')return 'Tidak dapat menghubungi Firebase. Semak sambungan Internet, kemudian cuba lagi.';
+ if(code==='auth/too-many-requests')return 'Terlalu banyak percubaan. Tunggu sebentar sebelum mencuba semula.';
+ if(code==='auth/user-disabled')return 'Akaun ini telah dinyahaktifkan. Hubungi pentadbir DASMOT SALES.';
+ if(code==='auth/operation-not-allowed')return 'Log masuk e-mel/kata laluan belum diaktifkan dalam Firebase Authentication.';
+ if(['auth/invalid-api-key','auth/api-key-not-valid.-please-pass-a-valid-api-key.'].includes(code))return 'Tetapan Firebase aplikasi tidak sah. Pentadbir perlu menyemak konfigurasi projek.';
+ if(code==='auth/unauthorized-domain')return 'Alamat laman ini belum dibenarkan dalam tetapan Firebase Authentication.';
+ return 'Log masuk belum berjaya. '+(code?`Kod ralat: ${code}.`:'Semak sambungan dan cuba lagi.');
+}
+function offlineStatus({online,ready,state}){const connection=online?'Online':'Offline';if(state==='file')return 'Fail HTML dibuka terus · Offline penuh memerlukan pautan aplikasi';if(state==='unsupported')return connection+' · Pelayar tidak menyokong mod offline';if(state==='failed')return connection+' · Persediaan offline gagal; cuba semula semasa online';return connection+' · '+(ready?'Aplikasi tersedia offline':'Menyediakan akses offline…');}
+
+return {loginError,offlineStatus};
+})();
+
 // app.js
 __modules["app.js"] = (() => {
 const {firebaseConfig} = __modules["firebase-config.js"];
@@ -239,6 +259,7 @@ const {synchronize} = __modules["stock-sync.js"];
 const {loanStates,paymentTypes,deliveryChecks,peroduaModels,toSen,paymentBalance} = __modules["sales-core.js"];
 const {salesTable,salesForm} = __modules["sales-ui.js"];
 const {synchronizeFinance} = __modules["finance-sync.js"];
+const {loginError,offlineStatus} = __modules["auth-ui.js"];
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>new Intl.NumberFormat('ms-MY',{style:'currency',currency:'MYR'}).format(n/100);
 const demo=!firebaseConfig;
@@ -254,18 +275,20 @@ let auth,db,api,user,member,loaded=demo,subscriptions=[],search='',editing=null,
 let loans=[],payments=[];
 let base={customers:[],bookings:[],stock:[],loans:[],payments:[]},queue=[],editBase=null,revising=null,pumping=false,storageReady=false,offlineReady=false,authReady=false,serverReady=false;
 let profileReady=false,seen=new Set(),lastSync=null,session=0,persistChain=Promise.resolve(),installPrompt;
+let offlineState='loading';
 const pendingMarkup=r=>r.pending?'<small class="pending">Belum disegerakkan</small>':'';
 const current=()=>['pelanggan','tempahan','stok','pinjaman','bayaran','penyerahan'].includes(location.hash.slice(1))?location.hash.slice(1):'ringkasan';
 const statuses={customers:['Baharu','Dihubungi','Berminat','Tidak berminat'],bookings:['Baharu','Diproses','Menunggu bank','Diluluskan','Dibatalkan']};
 const tag=s=>`<span class="tag ${s==='Diluluskan'||s==='Berminat'?'green':s==='Menunggu bank'?'amber':''}">${esc(s)}</span>`;
 function error(message){$('#feedback').textContent=message;}
 function render(){
+ document.body.classList.toggle('signed-out',!demo&&!user);
  renderStatus();
  const view=current();const names={ringkasan:'Dashboard',pelanggan:'Pelanggan & susulan',tempahan:'Tempahan',stok:'Stok & peruntukan kereta',pinjaman:'Pinjaman',bayaran:'Bayaran',penyerahan:'Penyerahan'};$('#breadcrumb').textContent=names[view];$('#title').textContent=names[view];$('#subtitle').textContent={ringkasan:'Ringkasan urusan jualan dan kenderaan belum diserahkan.',pelanggan:'Maklumat pelanggan, Sales Advisor dan susulan.',tempahan:'Model Perodua, varian, warna dan deposit diminta.',stok:'Dari penerimaan unit hingga peruntukan kepada pelanggan.',pinjaman:'Jejaki permohonan bank dan keputusan kelulusan.',bayaran:'Rekod wang diterima, baki dan pemulangan.',penyerahan:'Semak bayaran, dokumen dan tarikh serahan.'}[view];
  document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.hash==='#'+view));$('#new').textContent=({stok:'+ Unit baharu',tempahan:'+ Tempahan baharu',pinjaman:'+ Permohonan baharu',bayaran:'+ Rekod bayaran'})[view]||'+ Pelanggan baharu';$('#new').hidden=view==='penyerahan';$('#new').disabled=demo||!member||!loaded||!storageReady||(view==='stok'&&member.role!=='admin');
  if(demo)$('#notice').textContent='Pratonton • Semua rekod di bawah ialah data contoh. Penyimpanan akan diaktifkan selepas Firebase disambungkan.';
  if(!demo&&!user)return renderLogin();
- if(!demo&&!member){$('#content').innerHTML='<div class="panel empty"><h3>Akses belum tersedia</h3><p>Pentadbir perlu mengaktifkan akaun anda sebelum rekod jualan boleh dibuka.</p></div>';return;}
+ if(!demo&&!member){$('#content').innerHTML=`<div class="panel empty"><h3>${profileReady?'Akaun belum diaktifkan':'Mengesahkan akses akaun…'}</h3><p>${profileReady?'Log masuk berjaya, tetapi akses untuk versi baharu belum diberikan oleh pentadbir. Akaun ini belum boleh membuka rekod jualan.':'Aplikasi sedang menyemak akses anda. Sambungan Internet diperlukan jika akaun ini belum pernah digunakan pada peranti ini.'}</p></div>`;return;}
  if(!loaded){$('#content').innerHTML='<div class="panel empty">Memuatkan rekod jualan…</div>';return;}
  if(view==='stok'){renderStock();return;}
  if(view==='pinjaman'||view==='bayaran'){renderFinance(view==='pinjaman'?'loans':'payments');return;}
@@ -332,7 +355,7 @@ $('#record-form').addEventListener('submit',async e=>{e.preventDefault();if(demo
  await putChange(change);if(revising)await removeChange(revising);
  if(user?.uid!==uid)return;await refreshQueue();$('#editor').close();error('');void pump();
  }catch(err){$('#form-error').textContent=err.code==='sync/conflict'?err.message:'Perubahan belum disimpan. Storan peranti mungkin penuh atau tidak tersedia. Salin catatan anda sebelum menutup borang.';}finally{$('#save').disabled=!storageReady;}});
-function renderLogin(){ $('#content').innerHTML='<form id="login" class="panel login"><h2>Log masuk</h2><p>Gunakan akaun kakitangan yang telah diaktifkan.</p><label>E-mel<input name="email" type="email" required autocomplete="username"></label><label>Kata laluan<input name="password" type="password" required autocomplete="current-password"></label><button>Log masuk</button><p class="login-note">Log masuk pertama memerlukan Internet. Sesi kekal pada peranti ini untuk penggunaan offline. Gunakan peranti sendiri dan log keluar selepas selesai.</p></form>';$('#login button').disabled=!authReady||!navigator.onLine;$('#login').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),button=e.target.querySelector('button');button.disabled=true;try{await api.signInWithEmailAndPassword(auth,f.get('email'),f.get('password'));error('');}catch{error('Log masuk gagal. Semak Internet, akaun dan kata laluan anda.');}finally{button.disabled=!navigator.onLine;}};}
+function renderLogin(){ $('#content').innerHTML='<form id="login" class="panel login"><p class="eyebrow">DASMOT SALES</p><h2>Log masuk</h2><p>Gunakan akaun pengguna aplikasi DASMOT SALES.</p><label>E-mel<input name="email" type="email" required autocomplete="username"></label><label>Kata laluan<input name="password" type="password" required autocomplete="current-password"></label><p id="login-error" role="alert"></p><button>Log masuk</button><p class="login-note">Log masuk pertama memerlukan Internet. Sesi kekal pada peranti ini untuk penggunaan offline. Gunakan peranti sendiri dan log keluar selepas selesai.</p></form>';$('#login button').disabled=!authReady||!navigator.onLine;$('#login button').textContent=authReady?'Log masuk':'Menyambung ke Firebase…';$('#login').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),button=e.target.querySelector('button');button.disabled=true;button.textContent='Sedang log masuk…';$('#login-error').textContent='';try{await api.signInWithEmailAndPassword(auth,String(f.get('email')).trim(),f.get('password'));error('');}catch(err){const target=$('#login-error');if(target)target.textContent=loginError(err);}finally{button.disabled=!authReady||!navigator.onLine;button.textContent='Log masuk';}};}
 async function connect(){
  try{const [app,authentication,firestore]=await Promise.all([import('https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js')]);api={...authentication,...firestore};const instance=app.initializeApp(firebaseConfig);auth=api.getAuth(instance);db=api.getFirestore(instance);await api.setPersistence(auth,api.browserLocalPersistence);authReady=true;
  api.onAuthStateChanged(auth,async next=>{
@@ -345,14 +368,15 @@ async function connect(){
   function watchRecords(){if(watching)return;watching=true;for(const type of ['customers','bookings','stock','loans','payments']){let q=api.collection(db,'dasmot_v2_'+type);if(type!=='stock'&&member.role!=='admin')q=api.query(q,api.where('ownerId','==',next.uid));subscriptions.push(api.onSnapshot(q,{includeMetadataChanges:true},snap=>{if(epoch!==session||!member)return;if(snap.metadata.fromCache)return;base[type]=snap.docs.map(d=>{const value=d.data();return {...value,id:d.id,createdAt:{seconds:value.createdAt?.seconds||0},updatedAt:{seconds:value.updatedAt?.seconds||0}};});seen.add(type);loaded=seen.size===5;serverReady=profileReady&&loaded;lastSync=Date.now();refreshView();persistSnapshot();if(serverReady)void pump();},err=>{if(epoch!==session)return;serverReady=false;if(err.code==='permission-denied')denyAccess();else{$('#notice').textContent='Rekod terkini belum diterima. Rekod tersimpan masih boleh digunakan.';renderStatus();}}));}}
   subscriptions.push(api.onSnapshot(api.doc(db,'dasmot_v2_users',next.uid),{includeMetadataChanges:true},snap=>{if(epoch!==session||snap.metadata.fromCache)return;profileReady=true;if(!snap.exists()||!snap.data().active||!['admin','sales'].includes(snap.data().role)){denyAccess();return;}const role=snap.data().role;if(member&&member.role!==role){denyAccess();$('#notice').textContent='Peranan akaun berubah. Log masuk semula untuk menyegarkan akses.';return;}member={active:true,role,name:snap.data().name||next.email||next.uid};watchRecords();refreshView();},err=>{if(epoch!==session)return;serverReady=false;if(err.code==='permission-denied')denyAccess();else{$('#notice').textContent='Akses terkini belum dapat disahkan. Gunakan rekod offline yang tersedia.';renderStatus();}}));
  });
- }catch{$('#notice').textContent='Sambungan Firebase gagal dimulakan. Semak tetapan aplikasi dan sambungan Internet.';$('#new').disabled=true;}
+ }catch(err){authReady=false;$('#notice').textContent=err?.code?loginError(err):'Komponen Firebase tidak dapat dimuatkan. Semak Internet, kemudian muat semula halaman.';$('#new').disabled=true;const button=$('#login button');if(button){button.disabled=true;button.textContent='Sambungan belum tersedia';}}
 }
 function refreshView(){customers=projectRecords(base.customers,queue,'customers');bookings=projectRecords(base.bookings,queue,'bookings');stock=projectRecords(base.stock||[],queue,'stock');loans=projectRecords(base.loans||[],queue,'loans');payments=projectRecords(base.payments||[],queue,'payments');render();}
 async function refreshQueue(){const uid=user?.uid;if(!uid)return;const changes=await readQueue(uid);if(user?.uid!==uid)return;queue=changes;refreshView();}
 function persistSnapshot(){if(!user||!member||!storageReady||!loaded)return;const snapshot=structuredClone({uid:user.uid,member,base,lastSync});persistChain=persistChain.then(()=>saveSnapshot(snapshot)).catch(()=>{storageReady=false;$('#notice').textContent='Rekod terkini tidak dapat disimpan untuk offline. Storan peranti mungkin penuh.';render();});}
 function renderStatus(){
  const pending=queue.filter(x=>x.status!=='failed'),failed=queue.filter(x=>x.status==='failed');
- $('#connection').textContent=(navigator.onLine?'Online':'Offline')+' · '+(offlineReady?'Aplikasi tersedia offline':'Menyediakan akses offline…');
+ $('#connection').textContent=offlineStatus({online:navigator.onLine,ready:offlineReady,state:offlineState});
+ if(offlineState==='file'&&!$('#notice').textContent)$('#notice').textContent='Untuk sokongan offline penuh, buka aplikasi melalui pautan GitHub Pages atau pelayan lokal. Fail yang dibuka terus dari komputer tidak menyediakan fungsi ini.';
  if(!user){$('#sync-status').innerHTML='';return;}
  let message=!navigator.onLine?'Perubahan disimpan pada peranti. Buka aplikasi ini semula apabila Internet kembali.':pumping?'Sedang menyegerakkan perubahan…':pending.length?`${pending.length} perubahan menunggu penyegerakan.`:serverReady?'Rekod terkini telah diterima.':loaded?'Memaparkan rekod tersimpan; menunggu sambungan Firebase.':'Menunggu rekod dan pengesahan akaun.';
  if(lastSync&&loaded)message+=` Semakan terakhir: ${new Date(lastSync).toLocaleString('ms-MY')}.`;
@@ -374,7 +398,7 @@ window.addEventListener('online',()=>{serverReady=false;renderStatus();if(!user)
 window.addEventListener('offline',()=>{serverReady=false;renderStatus();if(!user)renderLogin();});
 window.addEventListener('focus',()=>{if(user)void refreshQueue().then(()=>pump()).catch(()=>{});});
 setInterval(()=>{if(user)void pump();},30000);
-async function prepareOffline(){if(!('serviceWorker' in navigator)){ $('#connection').textContent='Pelayar ini tidak menyokong aplikasi offline.';return;}try{const registration=await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;offlineReady=true;renderStatus();if(registration.waiting)$('#notice').textContent='Kemas kini tersedia. Tutup semua tab aplikasi dan buka semula selepas draf disimpan.';}catch{$('#connection').textContent='Akses offline belum siap. Buka semula aplikasi semasa Internet tersedia.';}}
+async function prepareOffline(){if(location.protocol==='file:'){offlineState='file';renderStatus();$('#notice').textContent='Fail ini dibuka terus dari komputer. Untuk menggunakan aplikasi dengan sokongan offline penuh, buka melalui pautan GitHub Pages atau pelayan lokal; jangan gunakan alamat file://.';return;}if(!('serviceWorker' in navigator)){offlineState='unsupported';renderStatus();return;}try{const registration=await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;offlineReady=true;offlineState='ready';renderStatus();const announce=()=>{$('#notice').textContent='Kemas kini tersedia. Tutup semua tab aplikasi dan buka semula selepas draf disimpan.';};if(registration.waiting)announce();registration.addEventListener('updatefound',()=>{const worker=registration.installing;worker?.addEventListener('statechange',()=>{if(worker.state==='installed'&&navigator.serviceWorker.controller)announce();});});}catch{offlineState='failed';renderStatus();}}
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('#install').hidden=false;});
 $('#install').onclick=async()=>{if(!installPrompt)return;await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('#install').hidden=true;};
 void prepareOffline();
@@ -388,3 +412,4 @@ if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContex
 return {};
 })();
 </script></body></html>
+
